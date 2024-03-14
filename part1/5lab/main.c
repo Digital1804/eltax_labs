@@ -65,7 +65,7 @@ int main(){
             del_abonent(abonents, count);
             break;
         case 3:
-        find_abonent(abonents, count);
+            find_abonent(abonents, count);
             break;
         case 4:
             for (int i = 0; i < count; i++)
