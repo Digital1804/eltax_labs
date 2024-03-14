@@ -6,6 +6,7 @@ typedef struct abonent{
     char second_name[10];
     char tel[10];
 } abonent;
+
 void add_abonent(abonent *abonents, int count){
     printf("\nInput abonent's name: ");
     scanf("%9s", abonents[count].name);
@@ -15,30 +16,31 @@ void add_abonent(abonent *abonents, int count){
     scanf("%9s", abonents[count].tel);
 }
 
-void del_abonent(abonent *abonents[100]){
+void del_abonent(abonent *abonents, int count){
     char name[10], second_name[10], ch;
-    printf("\nInput abonent's name: ");
+    printf("Input abonent's name: ");
     scanf("%9s", name);
     printf("\nInput abonent's second name: ");
     scanf("%9s", second_name);
-    for (int i = 0; i < 100; i++)
-        if ((strcmp(name, abonents[i]->name) == 0) & (strcmp(second_name, abonents[i]->second_name) == 0)){
+    for (int i = 0; i < count; i++){
+        if ((strcmp(name, abonents[i].name) == 0) & (strcmp(second_name, abonents[i].second_name) == 0)){
             for (int j = 0; j < 10; j++){
                 if (j==9)   ch = '\0';
                 else        ch = '0';
-                abonents[i]->name[j]= ch;
-                abonents[i]->second_name[j]= ch;
-                abonents[i]->tel[j]= ch;
+                abonents[i].name[j]= ch;
+                abonents[i].second_name[j]= ch;
+                abonents[i].tel[j]= ch;
             }
             break;
         }
+    }
 }
 
-void find_abonent(abonent *abonents){
+void find_abonent(abonent *abonents, int count){
     char name[10];
     printf("Input abonent's name: ");
     scanf("%9s", name);
-    for (int i = 0; i < sizeof(abonents)/sizeof(abonent); i++)
+    for (int i = 0; i < count; i++)
         if (strcmp(name, abonents[i].name) == 0)
             printf("\n%s %s %s\n", abonents[i].name, abonents[i].second_name, abonents[i].tel);
 }
@@ -60,10 +62,10 @@ int main(){
             count++;
             break;
         case 2:
-            del_abonent(&abonents);
+            del_abonent(abonents, count);
             break;
         case 3:
-        find_abonent(abonents);
+        find_abonent(abonents, count);
             break;
         case 4:
             for (int i = 0; i < count; i++)
