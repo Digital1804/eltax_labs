@@ -12,7 +12,7 @@ int main(){
 			break;
 		}
 		arr = (int*)realloc(arr, sizeof(int));
-    }
+	}
 	printf("\nResult:\t");
 	for (--i; i>=0; i--){
 		printf("%d ", arr[i]);

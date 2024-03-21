@@ -7,7 +7,7 @@ int main(){
 	scanf("%d", &N);
 	int **arr = (int**)calloc(N, sizeof(int*));
 	for (int i = 0; i < N ; i++){
-        arr[i] = (int*)calloc(N, sizeof(int));
+		arr[i] = (int*)calloc(N, sizeof(int));
 	}
 	int up_row = 0, down_row = N-1, left_column = 0, right_column = N-1, value = 1;
 	while (value <= N*N){
@@ -30,10 +30,11 @@ int main(){
 	}
 	printf("\nResult:\n");
 	for (int i = 0; i < N ; i++){
-		for (int j = 0; j < N ; j++)
+		for (int j = 0; j < N ; j++){
 			printf("%d\t", arr[i][j]);
+		}
 		printf("\n");
-        free(arr[i]);
+		free(arr[i]);
 	}
 	free(arr);
 	return 0;

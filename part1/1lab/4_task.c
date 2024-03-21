@@ -7,7 +7,7 @@ int main(){
 	scanf("%d", &num);
 	printf("Input second positive number(less 256):");
 	scanf("%d", &s_num);
-    num = (num & 0xFFFF00FF) | (s_num << 8);
-    printf("Result: %d\n", num);
+	num = (num & 0xFFFF00FF) | (s_num << 8);
+	printf("Result: %d\n", num);
 	return 0;
 }
