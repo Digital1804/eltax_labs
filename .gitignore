@@ -1,0 +1,5 @@
+*.o
+*.a
+*.so
+part2/2lab/calc
+part2/3lab/calc
