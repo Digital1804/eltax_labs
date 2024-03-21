@@ -18,8 +18,9 @@ int main(){
 		}
 	    printf("\n");
     }
-	for (int i = 0; i < N; i++)
+	for (int i = 0; i < N; i++){
         free(arr[i]);
+	}
 	free(arr);
 	return 0;
 }
