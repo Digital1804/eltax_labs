@@ -9,6 +9,7 @@
 #define MAX_FILES 1024
 int name_col_width, size_col_width, time_col_width;
 int height, width;
+char left_path[1024], right_path[1024];
 
 typedef struct {
     char name[256];
@@ -46,7 +47,7 @@ void list_directory(const char *path, FileInfo files[MAX_FILES], int *file_count
         stat(entry->d_name, &file_stat);
         files[*file_count].size = file_stat.st_size;
         files[*file_count].mtime = file_stat.st_mtime;
-        files[*file_count].mode = file_stat.st_mode; // Сохраняем режим файла
+        files[*file_count].mode = file_stat.st_mode;
         (*file_count)++;
     }
 
@@ -54,19 +55,23 @@ void list_directory(const char *path, FileInfo files[MAX_FILES], int *file_count
     qsort(files, *file_count, sizeof(FileInfo), compare_filenames);
 }
 void display_files(WINDOW *win, FileInfo files[MAX_FILES], int file_count, int highlight, char current_path[1024]) {
+    int x = 2, y = 3;
+    int max_lines = height - 4;
+
     box(win, 0, 0);
     mvwprintw(win, 2, 2, "%-*s %*s %-*s", name_col_width, "Name", size_col_width, "Size", time_col_width, "Last Modified");
-    int x = 2, y = 3; 
-    for (int i = 0; i < file_count; i++) {
+
+    for (int i = 0; i < max_lines && i < file_count; i++) {
         char mtime_str[20];
         struct tm *mtime_tm = localtime(&files[i].mtime);
         strftime(mtime_str, sizeof(mtime_str), "%m-%d %H:%M", mtime_tm);
-        if (S_ISDIR(files[i].mode)) { // Проверяем, является ли файл директорией
+        if (S_ISDIR(files[i].mode)) {
             if (i == highlight) {
                 wattron(win, A_REVERSE);
                 mvwprintw(win, y + i, x, "/%-*s %*ld %-*s", name_col_width - 1, files[i].name, size_col_width, files[i].size, time_col_width, mtime_str);
                 wattroff(win, A_REVERSE);
-            } else {
+            }
+            else {
                 mvwprintw(win, y + i, x, "/%-*s %*ld %-*s", name_col_width - 1, files[i].name, size_col_width, files[i].size, time_col_width, mtime_str);
             }
         } else {
@@ -74,7 +79,8 @@ void display_files(WINDOW *win, FileInfo files[MAX_FILES], int file_count, int h
                 wattron(win, A_REVERSE);
                 mvwprintw(win, y + i, x, "%-*s %*ld %-*s", name_col_width, files[i].name, size_col_width, files[i].size, time_col_width, mtime_str);
                 wattroff(win, A_REVERSE);
-            } else {
+            }
+            else {
                 mvwprintw(win, y + i, x, "%-*s %*ld %-*s", name_col_width, files[i].name, size_col_width, files[i].size, time_col_width, mtime_str);
             }
         }
@@ -104,65 +110,95 @@ void resize_windows() {
 
     keypad(left_win, TRUE);
     keypad(right_win, TRUE);
-
-    wrefresh(left_win);
-    wrefresh(right_win);
 }
 
 int main() {
     initscr();
-    noecho();
     cbreak();
     curs_set(FALSE);
     keypad(stdscr, TRUE);
 
 
-    int highlight = 0;
+    int highlight_left = 0, highlight_right = 0;
     int choice;
-    int file_count;
-    char current_path[1024];
-    FileInfo files[MAX_FILES];
-
-    getcwd(current_path, sizeof(current_path));
-    list_directory(current_path, files, &file_count);
+    int file_count_left, file_count_right;
+    FileInfo files_left[MAX_FILES], files_right[MAX_FILES];
+    bool is_left_active = TRUE;
+    int start_left = 0, start_right = 0;
+    getcwd(left_path, sizeof(left_path));
+    getcwd(right_path, sizeof(right_path));
+    list_directory(right_path, files_right, &file_count_right);  
+    list_directory(left_path, files_left, &file_count_left);
     while (1) {
         clear();
         resize_windows();
-        display_files(left_win, files, file_count, highlight, current_path);
-        display_files(right_win, files, file_count, highlight, current_path);
+        display_files(left_win, files_left, file_count_left, highlight_left, left_path);
+        display_files(right_win, files_right, file_count_right, highlight_right, right_path);
+        wrefresh(left_win);
         wrefresh(right_win);
 
-        choice = wgetch(left_win);
+
+        choice = wgetch(is_left_active ? left_win : right_win);
 
         switch (choice) {
+            case '\t':
+                if (is_left_active) {
+                    getcwd(left_path, sizeof(left_path));
+                } else {
+                    getcwd(right_path, sizeof(right_path));
+                }
+                is_left_active = !is_left_active;
+                if (is_left_active) {
+                    chdir(left_path);
+                } else {
+                    chdir(right_path);
+                }
+                break;
             case KEY_UP:
-                if (highlight > 0)
-                    highlight--;
+                if (is_left_active) {
+                    if (highlight_left > 0)
+                        highlight_left--;
+                } else {
+                    if (highlight_right > 0)
+                        highlight_right--;
+                }
                 break;
             case KEY_DOWN:
-                if (highlight < file_count - 1)
-                    highlight++;
+                if (is_left_active) {
+                    if (highlight_left < file_count_left - 1)
+                        highlight_left++;
+                } else {
+                    if (highlight_right < file_count_right - 1)
+                        highlight_right++;
+                }
                 break;
             case '\n':
-                if (strcmp(files[highlight].name, "..") == 0) {
-                    chdir("..");
-                } else if (strcmp(files[highlight].name, ".") != 0) {
+                if (is_left_active) {
                     struct stat file_stat;
-                    stat(files[highlight].name, &file_stat);
-                    if (S_ISDIR(file_stat.st_mode)) {
-                        chdir(files[highlight].name);
-                    }
+                        stat(files_left[highlight_left].name, &file_stat);
+                        if (S_ISDIR(file_stat.st_mode)) {
+                            chdir(files_left[highlight_left].name);
+                        }
+                    getcwd(left_path, sizeof(left_path));
+                    list_directory(left_path, files_left, &file_count_left);
+                    highlight_left = 0;
+                } 
+                else {
+                    struct stat file_stat;
+                        stat(files_right[highlight_right].name, &file_stat);
+                        if (S_ISDIR(file_stat.st_mode)) {
+                            chdir(files_right[highlight_right].name);
+                        }
+                    getcwd(right_path, sizeof(right_path));
+                    list_directory(right_path, files_right, &file_count_right);
+                    highlight_right = 0;
                 }
-                getcwd(current_path, sizeof(current_path));
-                list_directory(current_path, files, &file_count);
-                highlight = 0;
                 break;
             case 'q':
                 endwin();
                 return 0;
         }
     }
-
     endwin();
     return 0;
 }
