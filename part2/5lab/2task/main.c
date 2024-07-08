@@ -5,21 +5,22 @@
 #include <sys/wait.h>
 
 void create_fork(int num) {
-    pid_t pid = fork();
+    pid_t pid;
     int status;
 
-    if (pid < 0) {
-        perror("fork failed");
-        exit(EXIT_FAILURE);
-    } else if (pid == 0) {
-        // Дочерний процесс
-        printf("Process %d: PID = %d, PPID = %d\n", num, getpid(), getppid());
-        // Завершение дочернего процесса
-        exit(EXIT_SUCCESS);
-    }
-    else{
-        // Родительский процесс ждет завершения дочернего процесса
-        waitpid(pid, &status, 0);
+    switch (pid = fork()) {
+        case -1:
+            perror("fork failed");
+            exit(EXIT_FAILURE);
+        case 0:
+            // Дочерний процесс
+            printf("Process %d: PID = %d, PPID = %d\n", num, getpid(), getppid());
+            // Завершение дочернего процесса
+            exit(EXIT_SUCCESS);
+        default:
+            // Родительский процесс ждет завершения дочернего процесса
+            waitpid(pid, &status, 0);
+            break;
     }
 }
 
