@@ -1,8 +1,9 @@
 SRC := server.c client.c
 OBJ := $(SRC:.c=.o)
 BIN := server client
+HED := info.h
 CC := gcc
-CFLAGS = -lrt -lncurses 
+CFLAGS = -lrt -lncurses -lpthread
 
 .PHONY: clean all
 
@@ -12,7 +13,7 @@ $(BIN): %: %.o
 	$(CC) -o $@ $< $(CFLAGS)
 
 %.o: %.c
-	$(CC) -c -o $@ $<
+	$(CC) -c $< $(HED)
 	
 clean:
-	rm -rf client server *.o
+	rm -rf client server *.o info.h.gch
