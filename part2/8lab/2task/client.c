@@ -8,37 +8,94 @@
 #include <mqueue.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <semaphore.h>
+
 #include "info.h"
 
 WINDOW *left_win, *right_win, *down_win;
 bool running = TRUE;
-mqd_t mq;
+mqd_t service_queue, client_queue;
+sem_t sem;
 
-void resize_windows(){
-    int height, width;
-    char text[3][MAX_SIZE] = {"", "", ""};
-    getmaxyx(stdscr, height, width);
-    if (left_win != NULL)   delwin(left_win);
-    // else    winnstr(left_win, text[0], MAX_SIZE);
-    if (right_win != NULL)  delwin(right_win);
-    // else    winnstr(right_win, text[1], MAX_SIZE);
-    if (down_win != NULL)   delwin(down_win);
-    left_win = newwin(height*0.75, width*0.8, 0, 0);
-    right_win = newwin(height*0.75, width*0.2, 0, width*0.8);
-    down_win = newwin(height-height*0.75, width, height*0.75, 0);
+void change_left_win(){
+    if (left_win != NULL) {
+        delwin(left_win);
+    }
+    left_win = newwin(10, 80, 0, 0);
+    wbkgd(left_win, COLOR_PAIR(1));
     box(left_win, 0, 0);
+    wrefresh(left_win);
+}
+
+void change_right_win(){
+    if (right_win != NULL) {
+        delwin(right_win);
+    }
+    right_win = newwin(10, 20, 0, 80);
+    wbkgd(right_win, COLOR_PAIR(2));
     box(right_win, 0, 0);
+    wrefresh(right_win);
+}
+
+void change_down_win(){
+    if (down_win != NULL) {
+        delwin(down_win);
+    }
+    down_win = newwin(5, 100, 10, 0);
+    wbkgd(down_win, COLOR_PAIR(3));
     box(down_win, 0, 0);
+    wrefresh(down_win);
+}
+
+void print_down_win(char text[]) {
+    wclear(down_win);
+    box(down_win, 0, 0);
+    wrefresh(down_win);
+    wmove(down_win, 1, 1);
+    wprintw(down_win, "%s: ", text);
+}
+
+void print_right_win(char text[]) {
+    wclear(right_win);
+    char *temp = strdup(text);  // Создаем копию входной строки, чтобы не изменять оригинал
+    char *token = strtok(temp, " ");
+    int count = 0;
+    char *lines[MAX_CLIENTS];
+    while (token != NULL && count < MAX_CLIENTS) {
+        lines[count] = strdup(token);  // Копируем токен в массив строк
+        wmove(right_win, count+1, 1);
+        wprintw(right_win, "%s", lines[count]);
+        count++;
+        token = strtok(NULL, " ");
+    }
+    free(temp);  // Освобождаем временную копию строки
+
+    box(right_win, 0, 0);
+    wrefresh(right_win);
+}
+
+void print_left_win(char text[]) {
+    wclear(left_win);
+    box(left_win, 0, 0);
+    wrefresh(left_win);
+    wmove(left_win, 1, 1);
+    wprintw(left_win, "%s", text);
+}
+
+void create_windows(){
+    left_win = newwin(10, 80, 0, 0);
+    right_win = newwin(10, 20, 0, 80);
+    down_win = newwin(5, 100, 10, 0);
     wbkgd(left_win, COLOR_PAIR(1));
     wbkgd(right_win, COLOR_PAIR(2));
     wbkgd(down_win, COLOR_PAIR(3));
-    wmove(left_win, 1, 1);
-    wprintw(left_win, "%s", text[0]);
-    wmove(right_win, 1, 1);
-    wprintw(right_win, "%s", text[1]);
+    box(down_win, 0, 0);
+    box(left_win, 0, 0);
+    box(right_win, 0, 0);
     wrefresh(left_win);
     wrefresh(right_win);
     wrefresh(down_win);
+    refresh();
 }
 
 void init_pairs(){
@@ -48,11 +105,10 @@ void init_pairs(){
     init_pair(3, COLOR_BLUE, COLOR_BLACK);
 }
 
-void name_screen(char name[], mqd_t mq){
+void name_screen(char name[], mqd_t service_queue){
     WINDOW * wnd;
     message_t msg;
     msg.type = NAME;
-    // strncpy(" ", msg.text, MAX_SIZE);
     initscr();
     curs_set(TRUE);
     refresh();
@@ -67,95 +123,119 @@ void name_screen(char name[], mqd_t mq){
     delwin(wnd);
     curs_set(FALSE);
     endwin();
-    if (mq_send(mq, (char *)&msg, sizeof(msg), 0) == -1) {
+    FILE *fp;
+    fp = fopen("log.txt", "a");
+    fprintf(fp, "CLIENT send: %ld\t%s\t%s\n", msg.type, msg.text, msg.client_name);
+    fclose(fp);
+    if (mq_send(client_queue, (char *)&msg, sizeof(msg), 0) == -1) {
         perror("mq_send");
         exit(1);
     }
 }
 
 void *receive_messages(void *arg) {
+    FILE *fp;
     while (running) {
         message_t msg;
-        if (mq_receive(mq, (char *)&msg, sizeof(msg), NULL) == -1) {
-            
+        if (mq_receive(service_queue, (char *)&msg, sizeof(msg), NULL) == -1) {
             perror("mq_receive");
             exit(1);
-        }
-        else{
-            switch (msg.type){
+        } 
+        else {
+            fp = fopen("log.txt", "a");
+            fprintf(fp, "CLIENT recieve: %ld\t%s\t%s\n", msg.type, msg.text, msg.client_name);
+            fclose(fp);
+            sem_wait(&sem);
+            switch (msg.type) {
                 case CHAT:
                     break;
                 case MEMBERS:
-                    wclear(right_win);
-                    box(right_win, 0, 0);
-                    wmove(right_win, 1, 1);
-                    wprintw(right_win, "%s", msg.text);
-                    wrefresh(right_win);
-                    refresh();
+                    // print_right_win(msg.text);
                     break;
                 default:
                     break;
             }
+            sem_post(&sem);
         }
     }
     return NULL;
 }
 
-void main() {
+void sig_handler(int signo) {
+    if (signo == SIGINT) {
+        running = FALSE;
+    }
+}
 
+void handle_resize(int sig) {
+    // Не делать ничего, чтобы предотвратить изменение размера
+}
+int main() {
     char name[MAX_NAME_LEN + 1];
-    // Очистка буфера
     memset(name, 0, sizeof(name));
-
+    FILE *fp;
     struct mq_attr attr;
     attr.mq_flags = 0;
     attr.mq_maxmsg = 10;
     attr.mq_msgsize = sizeof(message_t);
     attr.mq_curmsgs = 0;
-    // Подключение к существующей очереди сообщений
-    mq = mq_open(QUEUE_NAME, O_RDWR);
-    if (mq == -1) {
-        perror("mq_open");
+    service_queue = mq_open(QUEUE_NAME, O_RDWR);
+    if (service_queue == -1) {
+        perror("service mq_open");
         exit(1);
     }
-    // Закрытие очереди
-    name_screen(name, mq);
+    client_queue = mq_open(CLIENT_QUEUE_NAME, O_RDWR);
+    if (client_queue == -1) {
+        perror("client mq_open");
+        exit(1);
+    }
+    sem_init(&sem, 0, 1);
+    name_screen(name, service_queue);
     initscr();
+    signal(SIGWINCH, handle_resize);
     clear();
     refresh();
     init_pairs();
-    resize_windows();
+    create_windows();
     cbreak();
     curs_set(FALSE);
-    // signal(SIGWINCH, sig_winch);
     wmove(down_win, 1, 1);
-    keypad(stdscr, TRUE);
+    keypad(down_win, TRUE);
     pthread_t receiver_thread;
     pthread_create(&receiver_thread, NULL, receive_messages, NULL);
-    message_t msg;
-    while (1){
-        wprintw(down_win, "%s: ", name);
+    signal(SIGINT, sig_handler);
+    while (1) {
+        message_t msg;
+        create_windows();
+        print_down_win(name);
         wgetnstr(down_win, msg.text, MAX_SIZE);
+        msg.type = TEXT;
         strncpy(msg.client_name, name, MAX_NAME_LEN+1);
-        if ((strcmp(msg.text, "exit") == 0) || (strcmp(msg.text, "e") == 0)){
+        if ((strcmp(msg.text, "exit") == 0) || (strcmp(msg.text, "e") == 0)) {
+            sem_wait(&sem);
             msg.type = QUIT;
-            if (mq_send(mq, (char *)&msg, sizeof(msg), 0) == -1) {
+            if (mq_send(client_queue, (char *)&msg, sizeof(msg), 0) == -1) {
                 perror("mq_send");
+                sem_destroy(&sem);
                 exit(1);
             }
+            sem_post(&sem);
             endwin();
             exit(0);
         }
-        msg.type = TEXT;
-        if (strncmp(msg.text, "", 5) != 0)
-            if (mq_send(mq, (char *)&msg, sizeof(msg), 0) == -1) {
+        if (strncmp(msg.text, "", 5) != 0) {
+            sem_wait(&sem);
+            if (mq_send(client_queue, (char *)&msg, sizeof(msg), 0) == -1) {
                 perror("mq_send");
+                sem_destroy(&sem);
                 exit(1);
             }
+            sem_post(&sem);
+        }
+        fp = fopen("log.txt", "a");
+        fprintf(fp, "CLIENT send: %ld\t%s\t%s\n", msg.type, msg.text, msg.client_name);
+        fclose(fp);
         memset(msg.text, 0, sizeof(msg.text));
-        wclear(down_win);
-        resize_windows();
-        wmove(down_win, 1, 1);
-        wrefresh(down_win);
     }
+    sem_destroy(&sem);
 }

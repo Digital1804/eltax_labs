@@ -6,4 +6,4 @@ main
 smain
 server
 client
-info.h
+*.*h
