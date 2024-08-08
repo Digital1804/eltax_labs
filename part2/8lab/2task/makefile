@@ -12,7 +12,7 @@ all: $(BIN)
 $(BIN): %: %.o 
 	$(CC) -o $@ $< $(CFLAGS)
 
-%.o: %.c
+%.o: %.c $(HED)
 	$(CC) -c $< $(HED)
 	
 clean:
