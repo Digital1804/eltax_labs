@@ -35,8 +35,28 @@ void concatenate_strings(char *result, client_t *clients, int num_strings) {
     result[strlen(result)] = '\0';
 }
 
+int is_file_empty(const char *filename) {
+    FILE *file = fopen(filename, "r");
+    if (file == NULL) {
+        perror("Error opening file");
+        return -1; // Ошибка при открытии файла
+    }
+
+    fseek(file, 0, SEEK_END);  // Перемещение указателя в конец файла
+    long size = ftell(file);   // Получение текущей позиции указателя (размер файла)
+    fclose(file);              // Закрытие файла
+
+    return size == 0; // Возвращает 1, если файл пуст, иначе 0
+}
+
+
 char **create_lines_list_from_end(const char *filename, int max_lines) {
     int lines_count = 0;
+
+    if (is_file_empty(filename)) {
+        return NULL;
+    }
+
     FILE *file = fopen(filename, "r");
     if (!file) {
         perror("Cannot open file");
@@ -44,11 +64,11 @@ char **create_lines_list_from_end(const char *filename, int max_lines) {
     }
 
     // Переместим указатель файла в конец
-
     fseek(file, 0, SEEK_END);
     long file_size = ftell(file);
 
-    char **lines = (char **)malloc(max_lines * sizeof(char *));
+    // Создаем массив строк
+    char **lines = (char **)calloc(max_lines, sizeof(char *));
     if (!lines) {
         perror("Memory allocation error");
         fclose(file);
@@ -75,11 +95,16 @@ char **create_lines_list_from_end(const char *filename, int max_lines) {
         // Считываем строку
         fseek(file, i + 1, SEEK_SET);
         fread(buffer, 1, len, file);
-        if (strlen(buffer) < 2) continue;
         buffer[len] = '\0';
 
+        // Проверка на пустую строку
+        if (strlen(buffer) == 0) {
+            pos = i;
+            continue;
+        }
+
         // Сохраняем строку в массиве
-        lines[lines_count] = strdup(buffer);
+        lines[lines_count] = strdup(buffer); // strdup выделяет память и копирует строку
         if (!lines[lines_count]) {
             perror("Memory allocation error");
             break;
@@ -91,9 +116,8 @@ char **create_lines_list_from_end(const char *filename, int max_lines) {
     }
 
     fclose(file);
-    return lines;
+    return lines; // Удаляем free, чтобы вернуть указатель на строки
 }
-
 void log_send(message_t msg) {
     FILE *fp = fopen("log.txt", "a");
     switch (msg.type) {
@@ -178,6 +202,8 @@ int main() {
     int client_count = 0;
     char client_queue_name[MAX_NAME_LEN + 15];
     
+    struct mq_attr attr;
+
     create_service_queue(&service_queue);
     signal(SIGINT, signal_handler);
     FILE *fp = fopen("log.txt", "w");
@@ -229,23 +255,47 @@ int main() {
                     }
                 }
                 break;
-            case HISTORY: // Клиент запрашивает историю сообщений
-                char **lines = create_lines_list_from_end("chat.txt", atoi(msg.text));
+            case HISTORY: {
+                int max_lines = atoi(msg.text);
+                char **lines = create_lines_list_from_end("chat.txt", max_lines);
                 char name[MAX_NAME_LEN+1];
                 strncpy(name, msg.client_name, MAX_NAME_LEN);
-                //  Отправляем строки
-                msg.type = HISTORY;
-                snprintf(msg.client_name, MAX_NAME_LEN + 1, "%s", "SERVER");
+
+                if (lines == NULL) {
+                    msg.text[0] = '\0';
+                    log_send(msg);
+                    for (int i = 0; i < client_count; i++) {
+                        if (strcmp(clients[i].name, name) == 0) {
+                            if (mq_send(clients[i].mq, (char *)&msg, sizeof(msg), 0) == -1) {
+                                perror("mq_send");
+                            }
+                            break;
+                        }
+                    }
+                    break;
+                }
+
+                mqd_t client_queue = (mqd_t) -1;
                 for (int i = 0; i < client_count; i++) {
-                    if (strcmp(clients[i].name, msg.client_name) == 0) {
-                        strncpy(msg.client_name, clients[i].name, MAX_NAME_LEN+1);
+                    if (strcmp(clients[i].name, name) == 0) {
                         client_queue = clients[i].mq;
                         break;
                     }
                 }
 
-                for (int i = sizeof(lines) * 2-1; i >=0 ; i--) {
-                    if (i == 0) snprintf(msg.client_name, MAX_NAME_LEN + 1, "%s", name);;
+                if (client_queue == (mqd_t) -1) {
+                    perror("Client queue not found");
+                    break;
+                }
+
+                int num_lines = 0;
+                for (int i = 0; i < max_lines; i++) {
+                    if (lines[i] != NULL) {
+                        num_lines++;
+                    }
+                }
+                msg.type = HISTORY;
+                for (int i = 0; i < num_lines; i++) {
                     strncpy(msg.text, lines[i], MAX_SIZE);
                     log_send(msg);
                     if (mq_send(client_queue, (char *)&msg, sizeof(msg), 0) == -1) {
@@ -253,12 +303,9 @@ int main() {
                     }
                     free(lines[i]); // Освобождаем память, выделенную для строки
                 }
-                // snprintf(msg.client_name, MAX_NAME_LEN + 1, "%s", name);
-                // if (mq_send(client_queue, (char *)&msg, sizeof(msg), 0) == -1) {
-                //     perror("mq_send");
-                // }
                 free(lines);
                 break;
+            }
             case QUIT: // Клиент отключается
                 msg.type = MEMBERS;
                 for (int i = 0; i < client_count; i++) {
@@ -270,6 +317,9 @@ int main() {
                         break;
                     }
                 }
+                chat = fopen("chat.txt", "a");
+                fprintf(chat, "%s left the chat\n", msg.client_name);
+                fclose(chat);
                 concatenate_strings(msg.text, clients, client_count);
                 for (int i = 0; i < client_count; i++) {
                     log_send(msg);

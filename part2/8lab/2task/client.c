@@ -13,18 +13,20 @@
 
 #include "info.h"
 
+// Структура для хранения строки чата
 typedef struct chat_line{
-    char *text;
-    char *name;
+    char *text;  // Текст сообщения
+    char *name;  // Имя отправителя
 } chat_line;
 
-WINDOW *left_win, *right_win, *down_win;
-bool running = TRUE;
-mqd_t service_queue, client_queue;
-// Создаем уникальное имя очереди для клиента
-pthread_mutex_t m1 = PTHREAD_MUTEX_INITIALIZER;
-chat_line **chat = NULL;
+WINDOW *left_win, *right_win, *down_win;  // Глобальные переменные для окон интерфейса
+bool running = TRUE;  // Флаг для работы основного цикла
+mqd_t service_queue, client_queue;  // Дескрипторы очередей сообщений
 
+pthread_mutex_t m1 = PTHREAD_MUTEX_INITIALIZER;  // Мьютекс для синхронизации
+chat_line **chat = NULL;  // Указатель на массив строк чата
+
+// Функция для отображения текста в нижнем окне
 void print_down_win(char text[]) {
     if (down_win == NULL) {
         return;
@@ -36,6 +38,7 @@ void print_down_win(char text[]) {
     wrefresh(down_win);
 }
 
+// Функция для отображения текста в правом окне
 void print_right_win(char text[]) {
     if (right_win == NULL) {
         return;
@@ -43,6 +46,8 @@ void print_right_win(char text[]) {
     wclear(right_win);
     box(right_win, 0, 0);
     wrefresh(right_win);
+
+    // Разбиваем входной текст на слова и выводим их построчно
     char *temp = strdup(text);  // Создаем копию входной строки, чтобы не изменять оригинал
     char *token = strtok(temp, " ");
     int count = 0;
@@ -62,6 +67,7 @@ void print_right_win(char text[]) {
     wrefresh(right_win);
 }
 
+// Функция для отображения чата в левом окне
 void print_left_win(int type, int chat_line_count) {
     if (left_win == NULL) {
         return;
@@ -80,6 +86,7 @@ void print_left_win(int type, int chat_line_count) {
     wrefresh(left_win);
 }
 
+// Функция для создания окон интерфейса
 int create_windows(){
     if (left_win != NULL) {
         delwin(left_win);
@@ -91,28 +98,39 @@ int create_windows(){
         delwin(down_win);
     }
     int height, width;
-    getmaxyx(stdscr, height, width);
+    getmaxyx(stdscr, height, width);  // Получаем размер терминала
+
+    // Выделяем память для массива строк чата
     chat = (chat_line**)calloc(height*0.75, sizeof(chat_line*));
     for (int i = 0; i < height; i++) {
         chat[i] = (chat_line*)calloc(MAX_SIZE, sizeof(chat_line));
     }
-    int max_chat_lines = height*0.75-2;
-    left_win = newwin(height*0.75, width*0.8, 0, 0);
-    right_win = newwin(height*0.75, width*0.2, 0, width*0.8);
-    down_win = newwin(height-height*0.75, width, height*0.75, 0);
+
+    int max_chat_lines = height*0.75-2;  // Максимальное количество строк чата
+    left_win = newwin(height*0.75, width*0.8, 0, 0);  // Создание левого окна
+    right_win = newwin(height*0.75, width*0.2, 0, width*0.8);  // Создание правого окна
+    down_win = newwin(height-height*0.75, width, height*0.75, 0);  // Создание нижнего окна
+
+    // Установка цветовых пар для окон
     wbkgd(left_win, COLOR_PAIR(1));
     wbkgd(right_win, COLOR_PAIR(2));
     wbkgd(down_win, COLOR_PAIR(3));
+
+    // Отрисовка рамок для окон
     box(down_win, 0, 0);
     box(left_win, 0, 0);
     box(right_win, 0, 0);
+
+    // Обновление окон
     wrefresh(left_win);
     wrefresh(right_win);
     wrefresh(down_win);
     refresh();
+
     return max_chat_lines;
 }
 
+// Функция инициализации цветовых пар
 void init_pairs(){
     start_color();
     init_pair(1, COLOR_RED, COLOR_BLACK);
@@ -120,6 +138,7 @@ void init_pairs(){
     init_pair(3, COLOR_BLUE, COLOR_BLACK);
 }
 
+// Начальная функция для получения имени клиента
 void start_screen(char name[], char client_queue_name[MAX_NAME_LEN + 15]){
     WINDOW *wnd;
     message_t msg;
@@ -128,13 +147,15 @@ void start_screen(char name[], char client_queue_name[MAX_NAME_LEN + 15]){
     initscr();
     curs_set(TRUE);
     refresh();
+
+    // Создаем окно для ввода имени
     wnd = newwin(5, 23, 2, 2);
     wbkgd(wnd, COLOR_PAIR(1));
     wattron(wnd, A_BOLD);
     wprintw(wnd, "Enter your name...\n");
-    wgetnstr(wnd, name, MAX_NAME_LEN);
+    wgetnstr(wnd, name, MAX_NAME_LEN);  // Получаем имя пользователя
     if (strlen(name) == 0) {
-        start_screen(name, client_queue_name);
+        start_screen(name, client_queue_name);  // Если имя пустое, повторяем ввод
         return;
     }
     name[MAX_NAME_LEN] = 0;
@@ -146,8 +167,8 @@ void start_screen(char name[], char client_queue_name[MAX_NAME_LEN + 15]){
     attr.mq_msgsize = sizeof(message_t);
     attr.mq_curmsgs = 0;
 
+    // Создаем уникальное имя очереди для клиента
     snprintf(client_queue_name, MAX_NAME_LEN + 15, "/client_queue_%s", name);
-    // Открываем уникальную очередь клиента
     client_queue = mq_open(client_queue_name, O_CREAT | O_RDWR, QUEUE_PERMISSIONS, &attr);
     if (client_queue == -1) {
         perror("client queue mq_open");
@@ -166,22 +187,28 @@ void start_screen(char name[], char client_queue_name[MAX_NAME_LEN + 15]){
     delwin(wnd);
     curs_set(FALSE);
     endwin();
+
+    // Логируем отправку имени клиента
     FILE *fp = fopen("log.txt", "a");
     fprintf(fp, "CLIENT %s send: %ld\t%s\n", name, msg.type, msg.text);
     fclose(fp);
     return;
 }
 
+// Поток для отправки сообщений на сервер
 void *send_messages(void *arg) {
     FILE *fp;
-    char *name = (char *)arg;
+    char *name = (char *)arg;  // Имя клиента
     while (running){
         message_t msg;
         memset(msg.text, 0, sizeof(msg.text));
+
         print_down_win(name);
-        wgetnstr(down_win, msg.text, MAX_SIZE);
+        wgetnstr(down_win, msg.text, MAX_SIZE);  // Ввод сообщения пользователем
         msg.type = TEXT;
         strncpy(msg.client_name, name, MAX_NAME_LEN+1);
+
+        // Если пользователь ввел команду выхода, отправляем сообщение о выходе
         if ((strcmp(msg.text, "exit") == 0) || (strcmp(msg.text, "e") == 0)) {
             pthread_mutex_lock(&m1);
             msg.type = QUIT;
@@ -194,6 +221,8 @@ void *send_messages(void *arg) {
             endwin();
             exit(0);
         }
+
+        // Отправляем сообщение на сервер
         if (strncmp(msg.text, "", 1) != 0) {
             pthread_mutex_lock(&m1);
             if (mq_send(service_queue, (char *)&msg, sizeof(msg), 0) == -1) {
@@ -203,6 +232,8 @@ void *send_messages(void *arg) {
             }
             pthread_mutex_unlock(&m1);
         }
+
+        // Логируем отправленное сообщение
         fp = fopen("log.txt", "a");
         fprintf(fp, "CLIENT %s send: %ld\t%s\n", name, msg.type, msg.text);
         fclose(fp);
@@ -210,6 +241,7 @@ void *send_messages(void *arg) {
     return NULL;
 }
 
+// Обработчик сигналов (в данной программе он не делает ничего, но может быть полезен для расширения)
 void signal_handler(int sig) {
     return;
 }
@@ -217,61 +249,78 @@ void signal_handler(int sig) {
 int main() {
     FILE *fp;
     initscr();
-    system("clear");
-    cbreak();
-    nodelay(left_win, TRUE);
+    system("clear");  // Очистка экрана
+    cbreak();  // Включаем режим cbreak (не буферизированный ввод)
+    nodelay(left_win, TRUE);  // Включаем неблокирующий режим для окон
     nodelay(right_win, TRUE);
-    curs_set(FALSE);
+    curs_set(FALSE);  // Отключаем отображение курсора
+
     char name[MAX_NAME_LEN + 1];
     memset(name, 0, sizeof(name));
+
+    // Открытие очереди сообщений с сервером
     service_queue = mq_open(QUEUE_NAME, O_RDWR);
     if (service_queue == -1) {
         perror("service mq_open");
         exit(1);
     }
+
     int chat_line_count = 0;
     char client_queue_name[MAX_NAME_LEN + 15];
-    start_screen(name, client_queue_name);
-    init_pairs();
+
+    start_screen(name, client_queue_name);  // Запрашиваем имя пользователя
+    init_pairs();  // Инициализация цветовых пар
     
-    int max_chat_lines = create_windows(&left_win, &right_win, &down_win);
-    signal(SIGWINCH, signal_handler);
+    int max_chat_lines = create_windows(&left_win, &right_win, &down_win);  // Создаем окна интерфейса
+    signal(SIGWINCH, signal_handler);  // Назначаем обработчик сигнала изменения размера окна
+
     wmove(down_win, 1, 1);
     keypad(down_win, TRUE);
+
+    // Создаем поток для отправки сообщений
     pthread_t sender_thread;
     pthread_create(&sender_thread, NULL, send_messages, name);
-    sleep(1);
+
+    sleep(1);  // Задержка перед началом получения сообщений
+
     message_t msg;
     msg.type = HISTORY;
     sprintf(msg.text, "%d", max_chat_lines);
     snprintf(msg.client_name, MAX_NAME_LEN+1, "%s", name);
+
+    // Отправляем запрос на получение истории сообщений
     if (mq_send(service_queue, (char *)&msg, sizeof(msg), 0) == -1) {
         perror("mq_send");
         exit(1);
     }
+
+    // Основной цикл получения сообщений
     while (1) {
         if (mq_receive(client_queue, (char *)&msg, sizeof(msg), NULL) == -1) {
             perror("mq_receive");
             exit(1);
-        } 
-        else {
+        } else {
+            // Логируем полученное сообщение
             fp = fopen("log.txt", "a");
-            fprintf(fp, "CLIENT %s recieve: %ld\t%s\tFROM %s\n", name, msg.type, msg.text, msg.client_name);
+            fprintf(fp, "CLIENT %s receive: %ld\t%s\tFROM %s\n", name, msg.type, msg.text, msg.client_name);
             fclose(fp);
+
             switch (msg.type) {
                 case CHAT:
+                    // Если чат заполнен, удаляем самое старое сообщение
                     if (chat_line_count == max_chat_lines) {
                         free(chat[0]->text);
                         free(chat[0]->name);
-                        free(chat[0]);         
+                        free(chat[0]);
+                        
                         // Сдвиг элементов массива влево
                         for (int i = 0; i < chat_line_count - 1; i++) {
                             chat[i] = chat[i + 1];
                         }
                         chat_line_count--;
-
                     }
-                    // Добавление новой строки в массив
+
+                    // Добавляем новое сообщение в чат
                     chat[chat_line_count] = (chat_line *)malloc(sizeof(chat_line));
                     chat[chat_line_count]->text = strdup(msg.text);
                     chat[chat_line_count]->name = strdup(msg.client_name);
@@ -279,20 +328,20 @@ int main() {
 
                     print_left_win(CHAT, chat_line_count);
                     break;
+
                 case MEMBERS:
-                    print_right_win(msg.text);
+                    print_right_win(msg.text);  // Отображаем список участников в правом окне
                     break;
+
                 case HISTORY:
+                    // Обработка сообщений истории чата
                     if (chat_line_count == max_chat_lines) {
-                                             
-                        // Сдвиг элементов массива влево
                         for (int i = 0; i < chat_line_count - 1; i++) {
                             chat[i] = chat[i + 1];
                         }
                         chat_line_count--;
-
                     }
-                    // Добавление новой строки в массив
+
                     chat[chat_line_count]->text = strdup(msg.text);
                     chat[chat_line_count]->name = strdup(msg.client_name);
                     if (chat_line_count < max_chat_lines)  chat_line_count++;
@@ -305,26 +354,33 @@ int main() {
             }
         }
     }
+
+    // Освобождаем память и закрываем окна
     delwin(left_win);
     delwin(right_win);
     delwin(down_win);
     endwin();
+
     for (int i = 0; i < chat_line_count; i++) {
         free(chat[i]->text);
         free(chat[i]->name);
         free(chat[i]);
     }
+
+    // Закрытие очередей сообщений
     if (mq_close(service_queue) == -1) {
         perror("service mq_close");
         exit(1);
     }
     if (mq_close(client_queue) == -1) {
-        perror("service mq_close");
+        perror("client mq_close");
         exit(1);
     }
     if (mq_unlink(client_queue_name) == -1) {
-        perror("service mq_unlink");
+        perror("client mq_unlink");
         exit(1);
     }
+
+    // Завершение потока отправки сообщений
     pthread_cancel(sender_thread);
 }
