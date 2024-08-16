@@ -14,6 +14,11 @@
 #define HISTORY 0
 #define MAX_CLIENTS 10
 
+/** @brief Структура сообщения
+    @param message_t::type Тип сообщения
+    @param message_t::client_name Имя клиента
+    @param message_t::text Текст сообщения
+*/
 typedef struct {
     long type;
     char text[MAX_SIZE];
