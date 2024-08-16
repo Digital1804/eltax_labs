@@ -13,20 +13,26 @@
 
 #include "info.h"
 
-// Структура для хранения строки чата
+
+/** @brief Структура для хранения строки чата
+    @param chat_line::text Текст сообщения
+    @param chat_line::name Имя отправителя
+*/
 typedef struct chat_line{
-    char *text;  // Текст сообщения
-    char *name;  // Имя отправителя
+    char *text;
+    char *name;
 } chat_line;
 
-WINDOW *left_win, *right_win, *down_win;  // Глобальные переменные для окон интерфейса
+WINDOW *left_win, *right_win, *down_win;  // Глобальная переменные для окна интерфейса
 bool running = TRUE;  // Флаг для работы основного цикла
-mqd_t service_queue, client_queue;  // Дескрипторы очередей сообщений
+mqd_t service_queue, client_queue;  // Дескриптор очереди сообщений
 
 pthread_mutex_t m1 = PTHREAD_MUTEX_INITIALIZER;  // Мьютекс для синхронизации
 chat_line **chat = NULL;  // Указатель на массив строк чата
 
-// Функция для отображения текста в нижнем окне
+/** @brief Функция для отображения текста в нижнем окне 
+    @param text[]: текст для отображения
+*/
 void print_down_win(char text[]) {
     if (down_win == NULL) {
         return;
@@ -38,7 +44,9 @@ void print_down_win(char text[]) {
     wrefresh(down_win);
 }
 
-// Функция для отображения текста в правом окне
+/** @brief Функция для отображения текста в правом окне 
+    @param text текст для отображения
+*/
 void print_right_win(char text[]) {
     if (right_win == NULL) {
         return;
@@ -67,7 +75,10 @@ void print_right_win(char text[]) {
     wrefresh(right_win);
 }
 
-// Функция для отображения чата в левом окне
+/** @brief Функция для отображения чата в левом окне 
+    @param type HISTORY: отображение чата, CHAT: отображение сообщения
+    @param chat_line_count количество строк чата
+*/
 void print_left_win(int type, int chat_line_count) {
     if (left_win == NULL) {
         return;
@@ -86,7 +97,9 @@ void print_left_win(int type, int chat_line_count) {
     wrefresh(left_win);
 }
 
-// Функция для создания окон интерфейса
+/** @brief Функция для создания окон интерфейса 
+    @return Возвращает количество доступных строк чата
+*/
 int create_windows(){
     if (left_win != NULL) {
         delwin(left_win);
@@ -130,7 +143,7 @@ int create_windows(){
     return max_chat_lines;
 }
 
-// Функция инициализации цветовых пар
+/** @brief Функция инициализации цветовых пар */
 void init_pairs(){
     start_color();
     init_pair(1, COLOR_RED, COLOR_BLACK);
@@ -138,7 +151,10 @@ void init_pairs(){
     init_pair(3, COLOR_BLUE, COLOR_BLACK);
 }
 
-// Начальная функция для получения имени клиента
+/** @brief Начальная функция для получения имени клиента 
+    @param name строка для хранения имени клиента
+    @param client_queue_name строка для хранения уникального имени очереди клиента
+*/
 void start_screen(char name[], char client_queue_name[MAX_NAME_LEN + 15]){
     WINDOW *wnd;
     message_t msg;
@@ -195,7 +211,7 @@ void start_screen(char name[], char client_queue_name[MAX_NAME_LEN + 15]){
     return;
 }
 
-// Поток для отправки сообщений на сервер
+/** @brief Поток для отправки сообщений на сервер */
 void *send_messages(void *arg) {
     FILE *fp;
     char *name = (char *)arg;  // Имя клиента
@@ -241,7 +257,7 @@ void *send_messages(void *arg) {
     return NULL;
 }
 
-// Обработчик сигналов (в данной программе он не делает ничего, но может быть полезен для расширения)
+/** @brief Обработчик сигналов (в данной программе он не делает ничего) */
 void signal_handler(int sig) {
     return;
 }

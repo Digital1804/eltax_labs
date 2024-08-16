@@ -15,7 +15,10 @@ typedef struct {
 } client_t;
 
 int running = 1;
-
+/** @brief Обработчик сигнала
+    При сочетании клавиш <Ctrl+C> вызывает функцию signal_handler 
+    @param signal 
+ */
 void signal_handler(int signal) {
     if (signal == SIGINT) {
         printf("Server stopped\n");
@@ -24,6 +27,11 @@ void signal_handler(int signal) {
     }
 }
 
+/** @brief Складывает массив клиентов в одну строку с именами 
+    @param result Итоговая строка
+    @param clients Массив строк
+    @param num_strings Количество клиентов
+*/
 void concatenate_strings(char *result, client_t *clients, int num_strings) {
     result[0] = '\0';
     for (int i = 0; i < num_strings; i++) {
@@ -34,7 +42,11 @@ void concatenate_strings(char *result, client_t *clients, int num_strings) {
     }
     result[strlen(result)] = '\0';
 }
-
+/**
+    @brief Проверяет, пуст ли файл
+    @param filename Имя файла
+    @return 1, если файл пуст, 0, если файл не пуст, -1, если произошла ошибка при открытии файла
+ */
 int is_file_empty(const char *filename) {
     FILE *file = fopen(filename, "r");
     if (file == NULL) {
@@ -49,7 +61,12 @@ int is_file_empty(const char *filename) {
     return size == 0; // Возвращает 1, если файл пуст, иначе 0
 }
 
-
+/**
+    @brief Создает массив строк из файла
+    @param filename Имя файла
+    @param max_lines Максимальное количество строк
+    @return Массив строк, NULL, если произошла ошибка при открытии файла или пустой файл
+*/
 char **create_lines_list_from_end(const char *filename, int max_lines) {
     int lines_count = 0;
 
@@ -118,6 +135,11 @@ char **create_lines_list_from_end(const char *filename, int max_lines) {
     fclose(file);
     return lines; // Удаляем free, чтобы вернуть указатель на строки
 }
+
+/**
+    @brief Логирование отправки сообщения
+    @param msg Отправленное сообщение
+ */
 void log_send(message_t msg) {
     FILE *fp = fopen("log.txt", "a");
     switch (msg.type) {
@@ -139,6 +161,10 @@ void log_send(message_t msg) {
     fclose(fp);
 }
 
+/**
+    @brief Логирование получения сообщения
+    @param msg Принятое сообщение
+ */
 void log_rcv(message_t msg) {
     FILE *fp = fopen("log.txt", "a");
     switch (msg.type) {
@@ -163,6 +189,10 @@ void log_rcv(message_t msg) {
     fclose(fp);
 }
 
+/**
+    @brief Создание очереди сообщений сервера 
+    @param client_queue Очередь сообщений сервера
+ */
 void create_service_queue(mqd_t *service_queue) {
     struct mq_attr attr;
 
@@ -178,6 +208,11 @@ void create_service_queue(mqd_t *service_queue) {
     }
 }
 
+/**
+    @brief Подключение к очереди сообщений клиента
+    @param client_name Имя клиента
+    @param client_queue Очередь сообщений клиента
+ */
 void connect_client_queue(char *client_name, mqd_t *client_queue) {
     char client_queue_name[MAX_NAME_LEN + 15];
     snprintf(client_queue_name, sizeof(client_queue_name), "/client_queue_%s", client_name);
