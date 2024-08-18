@@ -6,5 +6,5 @@ main
 smain
 server
 client
-*.*h
+*.gch
 *.txt
