@@ -6,17 +6,66 @@
 #include <unistd.h>
 #include <semaphore.h>
 #include <stdbool.h>
+#include <pthread.h>
+#include <ncurses.h>
 
 #include "clientlib.h"
 
 bool running = true;
+
+void start_screen(char name[], message_t *msg_ptr){
+    sem_t *sem;
+    sem = sem_open(SEM_TEXT, 0);
+    if (sem == SEM_FAILED) {
+        endwin();
+        perror("sem_open");
+        exit(1);
+    }
+    WINDOW *wnd;
+    initscr();
+    curs_set(TRUE);
+    refresh();
+
+    // Создаем окно для ввода имени
+    wnd = newwin(5, 23, 2, 2);
+    wbkgd(wnd, COLOR_PAIR(1));
+    wattron(wnd, A_BOLD);
+    wprintw(wnd, "Enter your name...\n");
+    wgetnstr(wnd, name, MAX_NAME_LEN);  // Получаем имя пользователя
+    if (strlen(name) == 0) {
+        sem_close(sem);
+        sem_unlink(SEM_TEXT);
+        start_screen(name, msg_ptr);  // Если имя пустое, повторяем ввод
+        return;
+    }
+    msg_ptr->type = NAME;
+    strncpy(msg_ptr->client_name, name, MAX_NAME_LEN);
+    for (int i = 0; i < 3; i++) {
+        sem_post(sem);
+    }
+    sem = sem_open(SEM_HOLD, 0);
+    if (sem == SEM_FAILED) {
+        endwin();
+        perror("sem_open");
+        exit(1);
+    }
+    wrefresh(wnd);
+    delwin(wnd);
+    endwin();
+    refresh();
+    sem_post(sem);
+    sem_close(sem);
+    
+    return;
+}
 
 /** @brief Функция для записи сообщений в разделяемую память
     @param arg - не используется
     @return NULL
 */
 void *write_to_shm(void *arg) {
-    sem_t *sem_text;
+    WINDOW *down_win = (WINDOW *)arg;
+    sem_t *sem_text, *sem_hold;
     message_t *msg_ptr;
     int msg_fd;
     msg_fd = shm_open(SHM_MSG, O_RDWR, 0666);// Подключаемся к существующему сегменту разделяемой памяти
@@ -34,19 +83,22 @@ void *write_to_shm(void *arg) {
         perror("sem_open");
         exit(1);
     }
+    sem_hold = sem_open(SEM_HOLD, 0);
+    if (sem_hold == SEM_FAILED) {
+        perror("sem_open");
+        exit(1);
+    }
+    start_screen(msg_ptr->client_name, msg_ptr);
+    sem_wait(sem_hold);
+    printf("write\n");
+    sleep(3);
+    sem_close(sem_hold);
     
-    char name[MAX_NAME_LEN];
-    printf("Input your name: ");
-    fgets(msg_ptr->client_name, MAX_NAME_LEN-1, stdin);
-    msg_ptr->client_name[strcspn(name, "\n")] = 0;
-    msg_ptr->type = NAME;
-    sem_post(sem_text);
-
     msg_ptr->type = TEXT;
-    while (1) {
-        printf("Message text: ");
-        fgets(msg_ptr->text, MAX_SIZE, stdin);
-        msg_ptr->text[strcspn(msg_ptr->text, "\n")] = 0;
+    while (1) {;
+        print_name(down_win, "Your message-> ");
+        wgetnstr(down_win, msg_ptr->text, MAX_SIZE);
+        // msg_ptr->text[strcspn(msg_ptr->text, "\n")] = 0;
         sem_post(sem_text);
         if (strcmp(msg_ptr->text, "exit") == 0) {
             running = false;
@@ -54,13 +106,9 @@ void *write_to_shm(void *arg) {
         }
     }
     running = false;
-    // Удаляем сегмент разделяемой памяти
     munmap(msg_ptr, sizeof(message_t));
-    // Отключаемся от сегмента
     shm_unlink(SHM_MSG);
-    // Закрываем семафоры
     sem_close(sem_text);
-    // Удаляем семафоры
     sem_unlink(SEM_TEXT);
     return NULL;
 }
@@ -70,6 +118,7 @@ void *write_to_shm(void *arg) {
     @return NULL
 */
 void *members_control(void *arg) {
+    WINDOW *right_win = (WINDOW *)arg;
     int members_fd;
     members_fd = shm_open(SHM_MEMBERS, O_RDWR, 0666);// Подключаемся к существующему сегменту разделяемой памяти
     if (members_fd == -1) {
@@ -88,10 +137,18 @@ void *members_control(void *arg) {
         perror("sem_open");
         exit(1);
     }
-    sem_wait(sem_members);
-    printf("Members:\n");
-    for (int i = 0; i < members_ptr->count; i++) {
-        printf("\t%s\n", members_ptr->names[i]);
+    sem_t *sem_hold = sem_open(SEM_HOLD, 0);
+    if (sem_hold == SEM_FAILED) {
+        perror("sem_open");
+        exit(1);
+    }
+    sem_wait(sem_hold);
+    printf("mem\n");
+    sem_close(sem_hold);
+    
+    while (running) {
+        sem_wait(sem_members);
+        print_members(right_win, members_ptr);
     }
     munmap(members_ptr, sizeof(members_t));
     shm_unlink(SHM_MEMBERS);
@@ -105,6 +162,7 @@ void *members_control(void *arg) {
     @return NULL
 */
 void *chat_control(void *arg) {
+    WINDOW *left_win = (WINDOW *)arg;
     int chat_fd;
     chat_fd = shm_open(SHM_CHAT, O_RDWR, 0666);
     if (chat_fd == -1) {
@@ -123,10 +181,18 @@ void *chat_control(void *arg) {
         perror("sem_open");
         exit(1);
     }
+    sem_t *sem_hold = sem_open(SEM_HOLD, 0);
+    if (sem_hold == SEM_FAILED) {
+        perror("sem_open");
+        exit(1);
+    }
+    sem_wait(sem_hold);
+    printf("chat\n");
+    sem_close(sem_hold);
+    
     while (running) {
         sem_wait(sem_chat);
-        for (int i = 0; i < chat_ptr->count; i++)
-            printf("%s\n", chat_ptr->text[i]);
+        print_chat(left_win, chat_ptr, getmaxy(left_win));
     }
     munmap(chat_ptr, sizeof(chat_t));
     shm_unlink(SHM_CHAT);

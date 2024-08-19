@@ -1,19 +1,24 @@
 #include <ncurses.h>
 #include <fcntl.h>
+#include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
+#include <semaphore.h>
 #include "clientlib.h"
 
-chat_line **chat = NULL;  // Указатель на массив строк чата
 /** @brief Функция для отображения текста в нижнем окне 
     @param text текст для отображения
 */
 void print_name(WINDOW *down_win, char text[]) {
-    if (down_win == NULL) {
-        return;
+    int height, width;
+    getmaxyx(stdscr, height, width);  // Получаем размер терминала
+    if (down_win != NULL) {
+        delwin(down_win);
     }
-    wclear(down_win);
+    down_win = newwin(height-height*0.75, width, height*0.75, 0);  // Создание нижнего окна
+    wbkgd(down_win, COLOR_PAIR(3));
     box(down_win, 0, 0);
-    wmove(down_win, 1, 1);
+    wmove(down_win, 1, 1); 
     wprintw(down_win, "%s: ", text);
     wrefresh(down_win);
 }
@@ -22,12 +27,14 @@ void print_name(WINDOW *down_win, char text[]) {
     @param members структура с именами участников чата
 */
 void print_members(WINDOW *right_win, members_t *members) {
-    if (right_win == NULL) {
-        return;
+    int height, width;
+    getmaxyx(stdscr, height, width);  // Получаем размер терминала
+    if (right_win != NULL) {
+        delwin(right_win);
     }
-    wclear(right_win);
+    right_win = newwin(height*0.75, width*0.2, 0, width*0.8);  // Создание правого окна
+    wbkgd(right_win, COLOR_PAIR(2));
     box(right_win, 0, 0);
-    wrefresh(right_win);
     wmove(right_win, 1, 1);
     wprintw(right_win, "Members:");
     for (int i = 0; i < members->count; i++) {
@@ -42,9 +49,13 @@ void print_members(WINDOW *right_win, members_t *members) {
     @param chat_line_count количество строк чата
 */
 void print_chat(WINDOW *left_win, chat_t *chat, int chat_line_count) {
-    if (left_win == NULL) {
-        return;
+    int height, width;
+    getmaxyx(stdscr, height, width);  // Получаем размер терминала
+    if (left_win != NULL) {
+        delwin(left_win);
     }
+    left_win = newwin(height*0.75, width*0.8, 0, 0);  // Создание левого окна
+    wbkgd(left_win, COLOR_PAIR(1));
     wclear(left_win);
     box(left_win, 0, 0);
     sleep(1);
@@ -77,6 +88,7 @@ int create_windows(WINDOW *down_win, WINDOW *left_win, WINDOW *right_win){
     down_win = newwin(height-height*0.75, width, height*0.75, 0);  // Создание нижнего окна
 
     // Установка цветовых пар для окон
+    init_pairs();
     wbkgd(left_win, COLOR_PAIR(1));
     wbkgd(right_win, COLOR_PAIR(2));
     wbkgd(down_win, COLOR_PAIR(3));

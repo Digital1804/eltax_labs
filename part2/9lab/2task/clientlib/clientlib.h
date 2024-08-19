@@ -10,6 +10,7 @@
 #define SEM_MEMBERS "/sem_members"
 #define SHM_CHAT "/shm_chat"
 #define SEM_CHAT "/sem_chat"
+#define SEM_HOLD "/sem_hold"
 #define MAX_SIZE 237
 #define MAX_NAME_LEN 16
 #define MAX_CLIENTS 10
@@ -64,5 +65,6 @@ void print_chat(WINDOW *left_win, chat_t *chat, int chat_line_count);
 int create_windows(WINDOW *down_win, WINDOW *left_win, WINDOW *right_win);
 void init_pairs();
 void signal_handler(int sig);
+void start_screen(char name[], message_t *msg_ptr);
 
 #endif

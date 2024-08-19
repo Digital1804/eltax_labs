@@ -1,23 +1,6 @@
-# CC := gcc
-# compile: server.o client.o
-# 	$(MAKE) -C clientlib
-# 	$(CC) -o server server.o -lrt
-# 	$(CC) -o client client.o -L./clientlib -lclient -Wl,-rpath,./clientlib -lrt -lncurses -lpthread
-
-# server.o: server.c
-# 	$(CC) -c server.c info.h
-
-# client.o: client.c
-# 	$(CC) -c client.c
-
-# clean:
-# 	rm -rf *.o clientlib/*.o *.gch
-# Основной Makefile
-
-# Параметры компилятора
 CC = gcc
-CFLAGS = -fPIC #-Wall 
-LDFLAGS_CLIENT = -L./clientlib -lclient -Wl,-rpath,./clientlib -lrt -lncurses -lpthread
+CFLAGS = -fPIC
+LDFLAGS_CLIENT =  -L./clientlib -lclient -Wl,-rpath,./clientlib -lrt -lncurses -lpthread 
 LDFLAGS_SERVER = info.h -lrt
 
 # Пути к файлам
@@ -39,7 +22,7 @@ TARGET_CLIENTLIB = clientlib/libclient.so
 all: $(TARGET_SERVER) $(TARGET_CLIENT)
 
 # Сборка сервера
-$(TARGET_SERVER): $(OBJS_SERVER) $(TARGET_CLIENTLIB)
+$(TARGET_SERVER): $(OBJS_SERVER)
 	$(CC) -o $@ $(OBJS_SERVER) $(LDFLAGS_SERVER)
 
 # Сборка клиента
