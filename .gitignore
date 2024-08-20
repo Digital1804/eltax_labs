@@ -8,3 +8,4 @@ server
 client
 *.gch
 *.txt
+rm_all*

@@ -41,6 +41,7 @@ typedef struct {
 typedef struct {
     char text[MAX_LINES][MAX_SIZE+MAX_NAME_LEN+3];
     int count;
+    int max_chat_lines;
 } chat_t;
 
 #endif

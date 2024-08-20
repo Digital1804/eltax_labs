@@ -1,5 +1,6 @@
 #include <ncurses.h>
 #include <fcntl.h>
+#include <semaphore.h>
 
 #ifndef CLIENT_H
 #define CLIENT_H
@@ -17,6 +18,23 @@
 #define MAX_LINES 50
 #define TEXT 2
 #define NAME 1
+
+/** @brief Структура клиента
+    @param client_UI::left_win окно чата
+    @param client_UI::right_win окно вывода  чата
+    @param client_UI::down_win окно ввода
+    @param client_UI::name Имя клиента
+    @param client_UI::win_hold Семафор для блокировки окон
+ */
+typedef struct client_UI
+{
+    WINDOW *left_win;
+    WINDOW *right_win;
+    WINDOW *down_win;
+    char name[MAX_NAME_LEN];
+    sem_t *win_hold;
+    int max_chat_lines;
+}client_UI;
 
 /** @brief Структура сообщения
     @param message_t::type Тип сообщения
@@ -45,6 +63,7 @@ typedef struct {
 typedef struct {
     char text[MAX_LINES][MAX_SIZE+MAX_NAME_LEN+3];
     int count;
+    int max_chat_lines;
 } chat_t;
 
 /** @brief Структура для хранения строки чата
@@ -60,11 +79,12 @@ void *write_to_shm(void *arg);
 void *members_control(void *arg);
 void *chat_control(void *arg);
 void print_name(WINDOW *down_win, char text[]);
-void print_members(WINDOW *right_win, members_t *members);
-void print_chat(WINDOW *left_win, chat_t *chat, int chat_line_count);
-int create_windows(WINDOW *down_win, WINDOW *left_win, WINDOW *right_win);
+void print_members(WINDOW *left_win, members_t *members);
+void print_chat(WINDOW *right_win, chat_t *chat, int chat_line_count);
+
+void create_windows(client_UI *client);
 void init_pairs();
 void signal_handler(int sig);
-void start_screen(char name[], message_t *msg_ptr);
+void start_screen(client_UI *client);
 
 #endif

@@ -11,10 +11,6 @@
 
 #include "info.h"
 
-sem_t *sem_msg, *sem_members, *sem_chat;
-members_t *members_ptr;
-message_t *msg_ptr;
-chat_t *chat_ptr;
 bool running = true;
 
 /** @brief Обработчик сигнала
@@ -30,6 +26,10 @@ void signal_handler(int signal) {
 }
 
 int main() {
+    sem_t *sem_msg, *sem_members, *sem_chat;
+    members_t *members_ptr;
+    message_t *msg_ptr;
+    chat_t *chat_ptr;
     signal(SIGINT, signal_handler);
 
     int chat_fd;
@@ -104,10 +104,10 @@ int main() {
         }
         else if (msg_ptr->type == TEXT) {
             if (strcmp(msg_ptr->text, "exit") == 0) {
-                snprintf(new_line, text_len, "Client %s disconnected\n", msg_ptr->client_name);
+                snprintf(new_line, text_len, "Client %s disconnected", msg_ptr->client_name);
             }
             else{
-                snprintf(new_line, text_len, "%s: %s\n", msg_ptr->client_name, msg_ptr->text);
+                snprintf(new_line, text_len, "%s: %s", msg_ptr->client_name, msg_ptr->text);
                 // printf("Client's answer:\nTYPE: %ld, TEXT: %s, NAME %s\n", msg_ptr->type, msg_ptr->text, msg_ptr->client_name);
             }
         }
@@ -116,7 +116,7 @@ int main() {
             chat_ptr->count++;
         }
         else{
-            for (int i = 0; i < MAX_LINES - 1; i++) {
+            for (int i = 0; i < MAX_LINES-1; i++) {
                 strncpy(chat_ptr->text[i], chat_ptr->text[i + 1], text_len);
             }
             snprintf(chat_ptr->text[chat_ptr->count], text_len, "%s", new_line);
