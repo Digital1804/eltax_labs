@@ -18,6 +18,7 @@
 #define MAX_LINES 50
 #define TEXT 2
 #define NAME 1
+#define EXIT 0
 
 /** @brief Структура клиента
     @param client_UI::left_win окно чата
@@ -32,8 +33,12 @@ typedef struct client_UI
     WINDOW *right_win;
     WINDOW *down_win;
     char name[MAX_NAME_LEN];
-    sem_t *win_hold;
     int max_chat_lines;
+    bool running;
+    char win_hold[MAX_NAME_LEN+10];
+    // char sem_text[MAX_NAME_LEN+10];
+    char sem_members[MAX_NAME_LEN+10];
+    char sem_chat[MAX_NAME_LEN+10];
 }client_UI;
 
 /** @brief Структура сообщения
@@ -43,7 +48,8 @@ typedef struct client_UI
 */
 typedef struct {
     long type;
-    char client_name[MAX_NAME_LEN];
+    // char client_name[MAX_NAME_LEN];
+    client_UI client;
     char text[MAX_SIZE];
 } message_t;
 
@@ -52,7 +58,8 @@ typedef struct {
     @param members_t::count Количество участников
 */
 typedef struct {
-    char names[MAX_CLIENTS][MAX_NAME_LEN];
+    client_UI clients[MAX_CLIENTS];
+    // char names[MAX_CLIENTS][MAX_NAME_LEN];
     int count;
 } members_t;
 
@@ -78,10 +85,9 @@ typedef struct chat_line{
 void *write_to_shm(void *arg);
 void *members_control(void *arg);
 void *chat_control(void *arg);
-void print_name(WINDOW *down_win, char text[]);
-void print_members(WINDOW *left_win, members_t *members);
-void print_chat(WINDOW *right_win, chat_t *chat, int chat_line_count);
-
+void print_members(client_UI *client, members_t *members_ptr);
+void print_chat(client_UI *client, chat_t *chat_ptr);
+void create_semaphores(client_UI *client);
 void create_windows(client_UI *client);
 void init_pairs();
 void signal_handler(int sig);

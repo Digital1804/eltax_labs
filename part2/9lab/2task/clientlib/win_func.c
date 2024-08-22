@@ -6,6 +6,37 @@
 #include <semaphore.h>
 #include "clientlib.h"
 
+/** @brief Функция для отображения текста в правом окне 
+    @param client структура клиента чата
+    @param members структура с именами участников чата
+*/
+void print_members(client_UI *client, members_t *members_ptr) {
+    wclear(client->right_win);
+    wbkgd(client->right_win, COLOR_PAIR(2));
+    box(client->right_win, 0, 0);
+    mvwprintw(client->right_win, 1, 1, "Members:");
+    for (int i = 0; i < members_ptr->count; i++) {
+        mvwprintw(client->right_win, i + 2, 1, "%s", members_ptr->clients[i].name);
+    }
+    wrefresh(client->right_win);
+}
+
+/** @brief Функция для отображения чата в левом окне 
+    @param client структура клиента чата
+    @param chat_line_count количество строк чата
+*/
+void print_chat(client_UI *client, chat_t *chat_ptr) {
+    wclear(client->left_win);
+    box(client->left_win, 0, 0);
+    sleep(1);
+    chat_ptr->max_chat_lines = client->max_chat_lines;
+    int start = (chat_ptr->count > client->max_chat_lines) ? chat_ptr->count - client->max_chat_lines : 0;
+    for (int i = start; i < chat_ptr->count; i++) {
+        mvwprintw(client->left_win, i - start + 1, 1, "%s", chat_ptr->text[i % client->max_chat_lines]);
+    }
+    wrefresh(client->left_win);
+}
+
 /** @brief Функция для отображения окна с вводом имени 
     @param client структура клиента
 */
@@ -25,75 +56,20 @@ void start_screen(client_UI *client){
         wgetnstr(wnd, name, MAX_NAME_LEN);  // Получаем имя пользователя
     }
 
+    // char sem_name[32];
+    // snprintf(sem_name, sizeof(sem_name), "/sem_hold_%s", client->name);
+    // client->win_hold = sem_open(sem_name, O_CREAT, 0644, 0);
     // Копируем имя в структуру
-    strncpy(client->name, name, MAX_NAME_LEN - 1);
+    strncpy(client->name, name, MAX_NAME_LEN);
+    client->running = 1;
     // client->name[MAX_NAME_LEN - 1] = '\0'; // На всякий случай добавляем нулевой символ
-    sem_post(client->win_hold);
     wclear(wnd);
     wrefresh(wnd);
     delwin(wnd);
     refresh();
+    sem_t *win_hold = sem_open(client->win_hold, 0);
+    sem_post(win_hold);
     return;
-}
-
-/** @brief Функция для отображения текста в нижнем окне 
-    @param text текст для отображения
-*/
-void print_name(WINDOW *down_win, char text[]) {
-    int height, width;
-    getmaxyx(stdscr, height, width);  // Получаем размер терминала
-    if (down_win != NULL) {
-        delwin(down_win);
-    }
-    down_win = newwin(height-height*0.75, width, height*0.75, 0);  // Создание нижнего окна
-    wbkgd(down_win, COLOR_PAIR(3));
-    box(down_win, 0, 0);
-    wmove(down_win, 1, 1); 
-    wprintw(down_win, "%s: ", text);
-    wrefresh(down_win);
-}
-
-/** @brief Функция для отображения текста в правом окне 
-    @param members структура с именами участников чата
-*/
-void print_members(WINDOW *right_win, members_t *members) {
-    int height, width;
-    getmaxyx(stdscr, height, width);  // Получаем размер терминала
-    if (right_win != NULL) {
-        delwin(right_win);
-    }
-    right_win = newwin(height*0.75, width*0.2, 0, width*0.8);  // Создание правого окна
-    wbkgd(right_win, COLOR_PAIR(2));
-    box(right_win, 0, 0);
-    wmove(right_win, 1, 1);
-    wprintw(right_win, "Members:");
-    for (int i = 0; i < members->count; i++) {
-        wmove(right_win, i + 2, 1);
-        wprintw(right_win, "%s", members->names[i]);
-    }
-    wrefresh(right_win);
-}
-
-/** @brief Функция для отображения чата в левом окне 
-    @param chat структура с сообщениями чата
-    @param chat_line_count количество строк чата
-*/
-void print_chat(WINDOW *left_win, chat_t *chat, int chat_line_count) {
-    int height, width;
-    getmaxyx(stdscr, height, width);  // Получаем размер терминала
-    if (left_win != NULL) {
-        delwin(left_win);
-    }
-    left_win = newwin(height*0.75, width*0.8, 0, 0);  // Создание левого окна
-    wbkgd(left_win, COLOR_PAIR(1));
-    wclear(left_win);
-    box(left_win, 0, 0);
-    sleep(1);
-    for (int i = chat->count-getmaxy(left_win); i < chat->count; i++) {
-        wmove(left_win, i + 1, 1);
-        wprintw(left_win, "%s", chat->text[i]);
-    }
-    wrefresh(left_win);
 }
 
 /** @brief Функция для создания окон интерфейса 
@@ -102,7 +78,6 @@ void print_chat(WINDOW *left_win, chat_t *chat, int chat_line_count) {
 void create_windows(client_UI *client){
     int height, width;
     getmaxyx(stdscr, height, width);  // Получаем размер терминала
-    printf("%d %d\n", height, width);
     client->max_chat_lines = height*0.75-2;  // Максимальное количество строк чата
     client->left_win = newwin(height*0.75, width*0.8, 0, 0);  // Создание левого окна
     client->right_win = newwin(height*0.75, width*0.2, 0, width*0.8);  // Создание правого окна

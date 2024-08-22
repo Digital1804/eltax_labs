@@ -9,7 +9,7 @@
 #include <stdbool.h>
 #include <signal.h>
 
-#include "info.h"
+#include "clientlib/clientlib.h"
 
 bool running = true;
 
@@ -26,7 +26,7 @@ void signal_handler(int signal) {
 }
 
 int main() {
-    sem_t *sem_msg, *sem_members, *sem_chat;
+    sem_t *sem_text, *sem_members, *sem_chat;
     members_t *members_ptr;
     message_t *msg_ptr;
     chat_t *chat_ptr;
@@ -45,11 +45,6 @@ int main() {
         exit(1);
     }
     chat_ptr->count = 0;
-    sem_chat = sem_open(SEM_CHAT, O_CREAT, 0666, 0);
-    if (sem_chat == SEM_FAILED) {
-        perror("sem_open");
-        exit(1);
-    }
 
     int members_fd;
     members_fd = shm_open(SHM_MEMBERS, O_CREAT | O_RDWR, 0666);
@@ -64,11 +59,6 @@ int main() {
         exit(1);
     }
     members_ptr->count = 0;
-    sem_members = sem_open(SEM_MEMBERS, O_CREAT, 0666, 0);
-    if (sem_members == SEM_FAILED) {
-        perror("sem_open");
-        exit(1);
-    }
     
     int msg_fd;
     msg_fd = shm_open(SHM_MSG, O_CREAT | O_RDWR, 0666);// Создаем сегмент разделяемой памяти
@@ -82,34 +72,70 @@ int main() {
         perror("mmap");
         exit(1);
     }
-    sem_msg = sem_open(SEM_TEXT, O_CREAT, 0666, 0);
-    if (sem_msg == SEM_FAILED) {
+    sem_text = sem_open(SEM_TEXT, O_CREAT, 0666, 0);
+    if (sem_text == SEM_FAILED) {
         perror("sem_open");
         exit(1);
     }  
     
+    FILE *chat_log = fopen("chat_log.txt", "w");
+    fclose(chat_log);
     printf("Server launched.\n");
     while (running){
-        sem_wait(sem_msg);// Ожидаем ответа от клиента
+        sem_wait(sem_text);// Ожидаем ответа от клиента
         size_t text_len = sizeof(chat_ptr->text[0]);
         char new_line[text_len];
-        if (msg_ptr->type == NAME) {
-            snprintf(new_line, text_len, "New client:%s\n", msg_ptr->client_name);
-            if (members_ptr->count < MAX_CLIENTS) {
-                strncpy(members_ptr->names[members_ptr->count], msg_ptr->client_name, MAX_NAME_LEN);
-                members_ptr->count++;
-            }
-            sem_post(sem_members);
-            sem_post(sem_chat);
-        }
-        else if (msg_ptr->type == TEXT) {
-            if (strcmp(msg_ptr->text, "exit") == 0) {
-                snprintf(new_line, text_len, "Client %s disconnected", msg_ptr->client_name);
-            }
-            else{
-                snprintf(new_line, text_len, "%s: %s", msg_ptr->client_name, msg_ptr->text);
-                // printf("Client's answer:\nTYPE: %ld, TEXT: %s, NAME %s\n", msg_ptr->type, msg_ptr->text, msg_ptr->client_name);
-            }
+        switch (msg_ptr->type) {
+            case NAME:
+                snprintf(new_line, text_len, "New client: %s", msg_ptr->client.name);
+                if (members_ptr->count < MAX_CLIENTS) {
+                    memcpy(&members_ptr->clients[members_ptr->count], &msg_ptr->client, sizeof(msg_ptr->client));
+                    members_ptr->count++;
+                }
+                for (int i = 0; i < members_ptr->count; i++) {
+                    sem_members = sem_open(members_ptr->clients[i].sem_members, 0);
+                    if (sem_members == SEM_FAILED) {
+                        perror("sem_name_open");
+                        exit(1);
+                    }
+                    sem_post(sem_members);
+                    printf("posted\n");
+                }
+                break;
+            case EXIT:
+                snprintf(new_line, text_len, "Client %s disconnected", msg_ptr->client.name);
+                
+                // Find and remove the client
+                for (int i = 0; i < members_ptr->count; i++) {
+                    if (strcmp(members_ptr->clients[i].name, msg_ptr->client.name) == 0) {
+                        sem_unlink(members_ptr->clients[i].win_hold);
+                        sem_unlink(members_ptr->clients[i].sem_chat);
+                        sem_unlink(members_ptr->clients[i].sem_members);
+                        printf("Client %s disconnected\n", msg_ptr->client.name);
+                        
+                        for (int j = i; j < members_ptr->count - 1; j++) {
+                            members_ptr->clients[j] = members_ptr->clients[j + 1];
+                        }
+                        members_ptr->count--;
+                        break; 
+                    }
+                }
+                for (int i = 0; i < members_ptr->count; i++) {
+                    sem_members = sem_open(members_ptr->clients[i].sem_members, 0);
+                    if (sem_members == SEM_FAILED) {
+                        perror("sem_exit_open");
+                        exit(1);
+                    }
+                    sem_post(sem_members);
+                    printf("posted\n");
+                }
+                break;
+            case TEXT:
+                if (strlen(msg_ptr->text) > 0)
+                    snprintf(new_line, text_len, "%s: %s", msg_ptr->client.name, msg_ptr->text);
+                break;
+            default:
+                break;
         }
         if (chat_ptr->count < MAX_LINES) {
             snprintf(chat_ptr->text[chat_ptr->count], text_len, "%s", new_line);
@@ -121,21 +147,32 @@ int main() {
             }
             snprintf(chat_ptr->text[chat_ptr->count], text_len, "%s", new_line);
         }
-        sem_post(sem_chat);
+        for (int i = 0; i < members_ptr->count; i++) {
+            sem_chat = sem_open(members_ptr->clients[i].sem_chat, O_CREAT, 0666, 0);
+            if (sem_chat == SEM_FAILED) {
+                perror("sem_chat_open");
+                exit(1);
+            }
+            sem_post(sem_chat);
+        }
     }
     // Удаляем сегмент разделяемой памяти
     munmap(members_ptr, sizeof(members_t));
     munmap(msg_ptr, sizeof(message_t));
     munmap(chat_ptr, sizeof(chat_t));
+    // Закрываем файловые дескрипторы
+    close(chat_fd);
+    close(members_fd);
+    close(msg_fd);
+    // Закрываем семафоры
+    sem_close(sem_text);
+    sem_close(sem_members);
+    sem_close(sem_chat);
     // Отключаемся от сегмента
     shm_unlink(SHM_MSG);
     shm_unlink(SHM_MEMBERS);
     shm_unlink(SHM_CHAT);
-    // Закрываем семафоры
-    sem_close(sem_msg);
-    sem_close(sem_members);
-    sem_close(sem_chat);
-    // Удаляем семафоры
+    // Удаляем семафоры 
     sem_unlink(SEM_TEXT);
     sem_unlink(SEM_MEMBERS);
     sem_unlink(SEM_CHAT);

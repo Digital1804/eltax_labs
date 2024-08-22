@@ -2,6 +2,8 @@ CC = gcc
 CFLAGS = -fPIC
 LDFLAGS_CLIENT =  -L./clientlib -lclient -Wl,-rpath,./clientlib -lrt -lncurses -lpthread 
 LDFLAGS_SERVER = info.h -lrt
+LDFLAGS =  -L./clientlib -lclient -Wl,-rpath,./clientlib -lrt -lncurses -lpthread 
+
 
 # Пути к файлам
 SRCS_SERVER = server.c
@@ -23,11 +25,11 @@ all: $(TARGET_SERVER) $(TARGET_CLIENT)
 
 # Сборка сервера
 $(TARGET_SERVER): $(OBJS_SERVER)
-	$(CC) -o $@ $(OBJS_SERVER) $(LDFLAGS_SERVER)
+	$(CC) -o $@ $(OBJS_SERVER) $(LDFLAGS)
 
 # Сборка клиента
 $(TARGET_CLIENT): $(OBJS_CLIENT) $(TARGET_CLIENTLIB)
-	$(CC) -o $@ $(OBJS_CLIENT) $(LDFLAGS_CLIENT)
+	$(CC) -o $@ $(OBJS_CLIENT) $(LDFLAGS)
 
 # Сборка динамической библиотеки клиентских функций
 $(TARGET_CLIENTLIB): $(OBJS_CLIENTLIB)
