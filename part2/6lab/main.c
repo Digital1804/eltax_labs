@@ -10,16 +10,9 @@
 #define BUYER_DEMAND_LIMIT 20000
 #define RESTOCK_AMOUNT 5000
 
-
 int stores[NUM_STORES];// Массив магазинов
-
-
 int buyer_needs[NUM_BUYERS];// Потребности покупателей
-
-
 pthread_mutex_t store_mutexes[NUM_STORES];// Мьютексы для синхронизации доступа к магазинам
-
-
 bool buyers_done = false;// Флаг для завершения работы потоков
 
 /** @brief Функция, выполняемая покупателями
