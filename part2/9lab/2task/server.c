@@ -8,6 +8,7 @@
 #include <pthread.h>
 #include <stdbool.h>
 #include <signal.h>
+#include <errno.h>
 
 #include "clientlib/clientlib.h"
 
@@ -95,23 +96,22 @@ int main() {
                 for (int i = 0; i < members_ptr->count; i++) {
                     sem_members = sem_open(members_ptr->clients[i].sem_members, 0);
                     if (sem_members == SEM_FAILED) {
-                        perror("sem_name_open");
+                        fprintf(stderr, "Error opening semaphore %s: %s\n", members_ptr->clients[i].sem_members, strerror(errno));
                         exit(1);
                     }
                     sem_post(sem_members);
-                    printf("posted\n");
+                    //printf("posted\n");
                 }
                 break;
             case EXIT:
                 snprintf(new_line, text_len, "Client %s disconnected", msg_ptr->client.name);
                 
-                // Find and remove the client
                 for (int i = 0; i < members_ptr->count; i++) {
                     if (strcmp(members_ptr->clients[i].name, msg_ptr->client.name) == 0) {
                         sem_unlink(members_ptr->clients[i].win_hold);
                         sem_unlink(members_ptr->clients[i].sem_chat);
                         sem_unlink(members_ptr->clients[i].sem_members);
-                        printf("Client %s disconnected\n", msg_ptr->client.name);
+                        //printf("Client %s disconnected\n", msg_ptr->client.name);
                         
                         for (int j = i; j < members_ptr->count - 1; j++) {
                             members_ptr->clients[j] = members_ptr->clients[j + 1];
@@ -122,12 +122,12 @@ int main() {
                 }
                 for (int i = 0; i < members_ptr->count; i++) {
                     sem_members = sem_open(members_ptr->clients[i].sem_members, 0);
+                    //printf("posted to %s\n", members_ptr->clients[i].name);
                     if (sem_members == SEM_FAILED) {
-                        perror("sem_exit_open");
+                        fprintf(stderr, "Error opening semaphore %s: %s\n", members_ptr->clients[i].sem_members, strerror(errno));
                         exit(1);
                     }
                     sem_post(sem_members);
-                    printf("posted\n");
                 }
                 break;
             case TEXT:

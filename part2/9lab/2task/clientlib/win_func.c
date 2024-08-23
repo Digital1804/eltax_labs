@@ -67,8 +67,6 @@ void start_screen(client_UI *client){
     wrefresh(wnd);
     delwin(wnd);
     refresh();
-    sem_t *win_hold = sem_open(client->win_hold, 0);
-    sem_post(win_hold);
     return;
 }
 

@@ -14,19 +14,20 @@
 int main() {
     initscr();
     system("clear");  // Очистка экрана
-    cbreak();  // Включаем режим cbreak (не буферизированный ввод)
+    nocbreak();  // Включаем режим cbreak (не буферизированный ввод)
     refresh();
     init_pairs();  // Инициализация цветовых пар
     curs_set(TRUE);  // Отключаем отображение курсора
     client_UI client;
+    start_screen(&client);
     create_semaphores(&client);
     sem_t *sem_chat = sem_open(client.sem_chat, O_CREAT, 0644, 1);
     sem_t *sem_members = sem_open(client.sem_members, O_CREAT, 0644, 1);
     sem_t *win_hold = sem_open(client.win_hold, O_CREAT, 0644, 1);
-    start_screen(&client);
     int height, width;
     getmaxyx(stdscr, height, width);
     create_windows(&client);  // Создаем окна интерфейса
+    sem_post(win_hold);
     signal(SIGWINCH, signal_handler);  // Назначаем обработчик сигнала изменения размера окна
 
     pthread_t write_thread;
