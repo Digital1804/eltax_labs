@@ -1,19 +1,31 @@
-#include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
+#include <signal.h>
 
-void handle_sigusr1(int sig){
-    printf("Caught signal %d (SIGUSR1)\n", sig);
+// Обработчик сигнала SIGUSR1
+void handle_sigusr1(int sig) {
+    printf("Recieved SIGUSR1\n");
 }
 
-int main(){
-    struct sigaction new_action, old_action;
-    new_action.sa_handler = handle_sigusr1;
-    sigemptyset(&new_action.sa_mask);
-    new_action.sa_flags = 0;
-    sigaction(SIGUSR1, &new_action, &old_action);
-    printf("Running...\n");
-    while(1){
+int main() {
+    struct sigaction sa;// Структура для настройки сигнала
+    sa.sa_handler = handle_sigusr1; // Установка функции-обработчика
+    sa.sa_flags = 0; // Нет дополнительных флагов
+    sigemptyset(&sa.sa_mask); // Пустая маска блокировки
+
+    // Установка обработчика сигнала SIGUSR1
+    if (sigaction(SIGUSR1, &sa, NULL) == -1) {
+        perror("set_error");
+        exit(EXIT_FAILURE);
     }
+
+    printf("Wait SIGUSR1... (PID: %d)\n", getpid());
+
+    // Бесконечный цикл ожидания
+    while (1) {
+        pause(); // Ожидание сигнала
+    }
+
     return 0;
 }
