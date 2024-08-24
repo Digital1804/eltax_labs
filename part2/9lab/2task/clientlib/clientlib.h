@@ -90,7 +90,6 @@ void print_chat(client_UI *client, chat_t *chat_ptr);
 void create_semaphores(client_UI *client);
 void create_windows(client_UI *client);
 void init_pairs();
-void signal_handler(int sig);
 void start_screen(client_UI *client);
 
 #endif
