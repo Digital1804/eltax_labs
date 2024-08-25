@@ -46,7 +46,7 @@ int main() {
     }
 
     // Получение ответа от сервера
-    if (read(client_socket, buffer, BUFFER_SIZE - 1) == -1) {
+    if (recv(client_socket, buffer, BUFFER_SIZE - 1, 0) == -1) {
         perror("read_error");
         close(client_socket);
         exit(EXIT_FAILURE);

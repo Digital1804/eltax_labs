@@ -49,7 +49,7 @@ int main() {
     
 
     // Получение данных от клиента
-    if (read(client_socket, buffer, BUFFER_SIZE - 1) == -1) {// Получение данных от клиента
+    if (recv(client_socket, buffer, BUFFER_SIZE - 1, 0) == -1) {// Получение данных от клиента
         perror("read_error");
         close(client_socket);
         close(server_socket);
