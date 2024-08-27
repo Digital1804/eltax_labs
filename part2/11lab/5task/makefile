@@ -1,6 +1,5 @@
 # Компилятор и флаги компиляции
 CC = gcc
-HEADER = config.h
 # Переменные
 SOURCES = $(wildcard *.c)
 OBJECTS = $(SOURCES:.c=.o)
@@ -14,12 +13,12 @@ $(TARGETS): %: %.o
 	$(CC) -o $@ $<
 
 # Создание объектных файлов
-%.o: %.c $(HEADER)
-	$(CC) -c $< $(HEADER)
+%.o: %.c 
+	$(CC) -c $<
 
 # Правило для очистки проекта
 clean:
-	rm -f $(OBJECTS) $(TARGETS) *.gch
+	rm -f $(OBJECTS) $(TARGETS)
 
 # Файлы, которые не являются файлами
 .PHONY: all clean
